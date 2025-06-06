@@ -15,6 +15,7 @@ from depthfl.dataset import load_datasets
 from depthfl.utils import save_results_as_pickle
 
 
+
 @hydra.main(config_path="conf", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> None:
     """Run the baseline.
