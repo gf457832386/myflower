@@ -43,16 +43,16 @@ import os
 import numpy as np
 import torch
 from fastNLP import DataSet, DataSetIter, SequentialSampler, Tester
-from models.modeling_roberta import RobertaForMaskedLM
+from .models.modeling_roberta import RobertaForMaskedLM
 from sklearn.metrics import f1_score
 from transformers import RobertaConfig, RobertaTokenizer
-from utils import hinge_loss
+from .utils import hinge_loss
 
 
 class LMForwardAPI:
     def __init__(self, args, train_data=None, dev_data=None, init_prompt_path=None, baseAPI=True):
         model_name = args.model_name
-        from metrics.metrics import (
+        from .metrics.metrics import (
             AGNewsMetric,
             DBPediaMetric,
             MRPCMetric,

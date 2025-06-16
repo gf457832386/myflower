@@ -1,3 +1,4 @@
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -8,7 +9,7 @@ version = "1.0.0"
 description = ""
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.18.0",
+    "flwr[simulation]==1.17.0",
     "flwr-datasets[vision]>=0.5.0",
     "torch==2.5.1",
     "torchvision==0.20.1",
@@ -25,12 +26,51 @@ serverapp = "fedbpt.server_app:app"
 clientapp = "fedbpt.client_app:app"
 
 [tool.flwr.app.config]
-num-server-rounds = 3
-fraction-fit = 0.5
-local-epochs = 1
+model_name = "roberta-large"
+task_name = "sst2"
+n_prompt_tokens = 50
+k_shot = 200
+batch_size = 32
+bound = 0
+sigma = 1
+alpha = 1
+eval_clients = "0"
+local_popsize = 5
+device = "cuda:0"
+alg = "CMA"
+random_proj = "normal"
+seed = 1234
+loss_type = "ce"
+print_every = 50
+eval_every = 100
+cat_or_add = "add"
+parallel = 0
+inference_framework = "pt"
+onnx_model_path = "None"
+local_iter = 8
+norm_prompt = 0
+prompt_norm_threshold_upper = 20
+prompt_norm_threshold = 15
+save_prompt = 0
+perturb = 1
+intrinsic_dim = 500
+num_clients= 10
+min_clients = 10
+num_rounds = 200
+start_round = 0
+num_users = 10
+iid = 1
+llama_causal = 1
+alpha_dir = 0.5
+perturb_rate = 0.5
+note = "None"
+init_score_path = "None"
 
 [tool.flwr.federations]
 default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 10
+options.backend.client-resources.num-cpus=1
+options.backend.client-resources.num-gpus=0.1
+

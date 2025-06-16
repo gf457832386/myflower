@@ -66,7 +66,7 @@ class data_processor:
         # below are free hyper-params
         self.model_name = args.model_name
         if self.model_name in ["t5-small", "t5-base", "t5-large", "t5-3b"]:
-            from dataloaders.dataloader_t5 import (
+            from .dataloaders.dataloader_t5 import (
                 AGNewsLoader,
                 DBPediaLoader,
                 MRPCLoader,
@@ -76,7 +76,7 @@ class data_processor:
                 YelpPLoader,
             )
         elif self.model_name in ["gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl"]:
-            from dataloaders.dataloader_gpt import (
+            from .dataloaders.dataloader_gpt import (
                 AGNewsLoader,
                 DBPediaLoader,
                 MRPCLoader,
@@ -86,7 +86,7 @@ class data_processor:
                 YelpPLoader,
             )
         elif self.model_name in ["fnlp/cpt-large"]:
-            from dataloaders.dataloader_cpt import (
+            from .dataloaders.dataloader_cpt import (
                 AmazonLoader,
                 BQLoader,
                 C3Loader,
@@ -99,7 +99,7 @@ class data_processor:
                 TNewsLoader,
             )
         elif self.model_name in ["llama2"]:
-            from dataloaders.dataloader_llama import (
+            from .dataloaders.dataloader_llama import (
                 AGNewsLoader,
                 DBPediaLoader,
                 MRPCLoader,
@@ -109,7 +109,7 @@ class data_processor:
                 YelpPLoader,
             )
         else:
-            from dataloaders.dataloader import (
+            from .dataloaders.dataloader import (
                 AGNewsLoader,
                 DBPediaLoader,
                 MRPCLoader,

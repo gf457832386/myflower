@@ -1,26 +1,27 @@
 """fedbpt: A Flower / PyTorch app."""
 
 import copy
-from csv import writer
 import os
 import random
 import time
 import cma
 import numpy as np
 import torch
-
-from flwr.client import ClientApp, NumPyClient
-from flwr.common import Context,FitRes,Status,Code,Parameters,EvaluateRes
-from LMForwardAPI import LMForwardAPI
-from data_process import construct_true_few_shot_data, perturb_dataset, split_data
+from ..data_process import construct_true_few_shot_data, split_data,data_processor,perturb_dataset
 from cma.recombination_weights import RecombinationWeights
+from transformers import RobertaTokenizer
+from ..LMForwardAPI import LMForwardAPI
+from flwr.common import FitRes,Status,Code,EvaluateRes
 from flwr.client.client import Client
-import data_process
-from utils import parameters2es,result2parameters,parameters2result,es2parameters,Model
-
+from ..utils import parameters2es,result2parameters
 # Define Flower Client and client_fn
 class FedBPTClient(Client):
-    def __init__(self, args,train_data,dev_data,test_data,user_dict_train,user_dict_dev, client_id,frac = 1):
+    def __init__(self, args,train_data,dev_data,test_data,user_dict_train,user_dict_dev, client_id,tokenizer,model_forward_api,local_cma_mu,frac = 1):
+
+        self.tokenizer = tokenizer
+        self.model_forward_api = model_forward_api
+        self.local_cma_mu = local_cma_mu
+
         self.train_data = train_data
         self.dev_data = dev_data
         self.test_data = test_data
@@ -29,16 +30,13 @@ class FedBPTClient(Client):
 
         self.args = args
         self.model_name = args.model_name
-        task_name = args.task_name
         self.n_prompt_tokens = args.n_prompt_tokens
         intrinsic_dim = args.intrinsic_dim
-        k_shot = args.k_shot
         self.batch_size = args.batch_size
         self.bound = args.bound
         self.sigma = args.sigma
         self.alpha = args.alpha
         self.eval_clients = args.eval_clients
-        # print(client_id)
 
         if args.local_popsize > 0:
             args.local_popsize = args.local_popsize
@@ -52,7 +50,7 @@ class FedBPTClient(Client):
         self.loss_type = args.loss_type
         self.print_every = args.print_every
         self.eval_every = args.eval_every
-        cat_or_add = args.cat_or_add
+        
         self.parallel = args.parallel
         inference_framework = args.inference_framework
         onnx_model_path = args.onnx_model_path
@@ -63,29 +61,7 @@ class FedBPTClient(Client):
             assert onnx_model_path is not None, "Path to onnx model is required, got None instead."
             assert os.path.exists(onnx_model_path), f"In valid onnx model path `{onnx_model_path}`"
 
-        # fixed hyper-params
-        if cat_or_add == "add":
-            init_prompt_path = None
-        else:
-            init_prompt_path = "./nli_base_prompt.pt"
-
-
-        random.seed(self.seed)
-        np.random.seed(self.seed)
-        torch.manual_seed(self.seed)
-
-        from transformers import RobertaTokenizer
-
-        self.tokenizer = RobertaTokenizer.from_pretrained("roberta-large")
-
-        # Initialize API
-        # LLM的前向传播接口
-        self.model_forward_api = LMForwardAPI(args=args, init_prompt_path=init_prompt_path)
-
         self.global_api_setting = self.model_forward_api.client_record()
-
-
-
         # use site name index to access data shards and track outputs
         # 获取client编号
         self.idx = client_id
@@ -93,9 +69,7 @@ class FedBPTClient(Client):
 
         self.client_fitnesses_orig_dict = {self.idx: []}
         self.client_fitnesses_pert_dict = {self.idx: []}
-        self.client_prompt_dict = {self.idx: []}
-
-        self.local_cma_mu = RecombinationWeights(args.local_popsize).mu
+        self.client_prompt_dict = {self.idx: []}     
 
         self.client_api_setting_list = {self.idx: self.model_forward_api.client_record()}
 
@@ -113,24 +87,14 @@ class FedBPTClient(Client):
         }
         self.local_es = cma.CMAEvolutionStrategy(self.args.intrinsic_dim * [0], self.sigma, inopts=self.cma_opts)
 
-
     def fit(self, ins,timeout=0, group_id=0):
         # 从server获取模型参数
-
-        # mean,C,sigma,pc,ps = parameters2es(ins.parameters,ins.config['dim'])# sever es
-        # self.local_es = cma.CMAEvolutionStrategy(mean, sigma, inopts=self.cma_opts)
-        # # global_es.C = C
-        # # global_es.pc = pc
-        # current_round = ins.config['current_round']
-        # global_es = ins.parameters.params['global_es']
-        # current_round = global_es = ins.parameters.current_round
         global_es = parameters2es(ins.parameters)# sever es
         current_round = ins.config['current_round']
         print(f"Running current_round={current_round}")
         print(
             f"Received global_es.sigma={global_es.sigma} and global_es.mean: len={len(global_es.mean)}, mean={np.mean(global_es.mean)}, std={np.std(global_es.mean)}"
         )
-
         self.local_es = global_es._copy_light(
             inopts={"seed": self.seed, "maxiter": self.args.local_iter, "popsize": self.args.local_popsize, "CMA_mu": None}
         )# client es
@@ -196,7 +160,6 @@ class FedBPTClient(Client):
 
         self.model_forward_api.set_dataset(local_train_data, local_dev_data, local_train_data_aux)
 
-        # opt = cma.CMAOptions()
         local_sigmas = []
         start_time = time.time()
         # client训练
@@ -271,13 +234,13 @@ class FedBPTClient(Client):
             "solutions": solutions,
             "fitnesses": fitnesses,
             "local_sigmas": local_sigmas,
-            "local_cma_mu": np.array([self.local_cma_mu]),
+            "local_cma_mu": self.local_cma_mu,
         }
         # send model back to NVFlare
         print("Client:",self.idx)
         output_model = result2parameters(params)
         # output_model = Model(params=params,metrics={},current_round=0,tensor_type=int,tensors=[])
-        print("Send params back", list(params.keys()))
+        print("Send params back", params.keys())
         return FitRes(status=Status(
                 code=Code.OK,
                 message="Client fit",),
@@ -313,11 +276,57 @@ class FedBPTClient(Client):
                 num_examples=1,
                 metrics={"accuracy":global_test_acc},)
 
-def gen_client_fn(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev):
-    def client_fn(cid:str):
-        # Return Client instance
-        return FedBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,int(cid)).to_client()
-    return client_fn
+
 
 # Flower ClientApp
+def gen_client_fn(args):
+    # Initialize data processor
+    dp = data_processor(args)
+    data_bundle = dp.get_data()
+    if args.task_name in ["agnews", "yelpp", "dbpedia", "snli"]:
+        train_data, test_data = data_bundle.get_dataset("train"), data_bundle.get_dataset("test")
+    else:
+        train_data, test_data = data_bundle.get_dataset("train"), data_bundle.get_dataset("validation")
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
+    # 提取少量代表性样本，返回下标
+    train_data, dev_data = construct_true_few_shot_data(args, train_data, args.k_shot)
+
+    # 填充数据，确保长度一致，并设置对应掩码
+    for ds in [train_data, dev_data, test_data]:
+        ds.set_pad_val(
+            "input_ids", dp.tokenizer.pad_token_id if dp.tokenizer.pad_token_id is not None else 0
+        )
+        ds.set_pad_val("attention_mask", 0)
+    print("# of train data: {}".format(len(train_data)))
+    print("Example:")
+    print(train_data[0])
+    print("\n# of dev data: {}".format(len(dev_data)))
+    print("Example:")
+    print(dev_data[0])
+    print("\n# of test data: {}".format(len(test_data)))
+    print("Example:")
+    print(test_data[0])
+
+    # Split dataset，根据num_users分
+    user_dict_train, user_dict_dev = split_data(args, train_data, dev_data)
+
+    local_cma_mu=RecombinationWeights(args.local_popsize).mu
+    tokenizers=RobertaTokenizer.from_pretrained("roberta-large")
+
+    # Initialize API
+    # LLM的前向传播接口
+    # fixed hyper-params
+    cat_or_add = args.cat_or_add
+    if cat_or_add == "add":
+        init_prompt_path = None
+    else:
+        init_prompt_path = "./nli_base_prompt.pt"
+    model_forward_apis=LMForwardAPI(args=args, init_prompt_path=init_prompt_path)
+    def client_fn(cid:str):
+        # Return Client instance
+        cid = int(cid)
+        return FedBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
+    return client_fn

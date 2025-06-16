@@ -42,7 +42,7 @@ from fastNLP.core.metrics import MetricBase
 from fastNLP.core.utils import _get_func_signature
 from sklearn.metrics import accuracy_score, f1_score
 from transformers import RobertaTokenizer
-from utils import hinge_loss
+from ..utils import hinge_loss
 
 
 class SST2Metric(MetricBase):
