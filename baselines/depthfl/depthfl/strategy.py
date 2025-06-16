@@ -22,7 +22,7 @@ from flwr.server.strategy import FedAvg
 from omegaconf import DictConfig
 
 
-class FedDyn(FedAvg):
+class FedLo(FedAvg):
     """Applying dynamic regularization in FedDyn paper."""
 
     def __init__(self, cfg: DictConfig, net: nn.Module, *args, **kwargs):

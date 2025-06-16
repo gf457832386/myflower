@@ -207,4 +207,6 @@ class ServerFedDyn(Server):
         )
 
         parameters_aggregated, metrics_aggregated = aggregated_result
+
+        
         return parameters_aggregated, metrics_aggregated, (results, failures)

@@ -135,7 +135,7 @@ class FedBPTClient(Client):
             inopts={"seed": self.seed, "maxiter": self.args.local_iter, "popsize": self.args.local_popsize, "CMA_mu": None}
         )# client es
 
-        local_sigma_current = self.local_es.sigma
+        local_sigma_current =copy.deepcopy(self.local_es.sigma) 
         global_test_acc = -1
         if self.idx in self.eval_clients:
             # 测试

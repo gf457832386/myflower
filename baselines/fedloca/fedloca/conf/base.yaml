@@ -1,77 +1,74 @@
-# conf/base.yaml
-#
-# 这是 Hydra 的主配置文件，后续运行时会自动读取并注入到代码中。
-# 您可以根据需要调整 num_clients、num_rounds、lr、batch_size 等超参数。
+# conf/config.yaml
 
 defaults:
-  - dataset: 20newsgroup      # 使用您自己的数据集加载器
-  - model: robarta-base         # 使用带 LoRA wrapper 的模型
-  - strategy: fedloca              # 使用您自己的 FedLoCA 策略
-  - hydra/job_logging: disabled
-  - hydra/hydra_logging: disabled
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
 
-# 全局联邦学习设置
-num_clients: 100
-num_rounds: 20
-rank: 16
-alpha: 32
+# runtime
 gpuid: 1
-timestamp: ${date +"%m%d%H%M"}
-daystamp: ${date +"%m%d"}
-model_p_or_n: "roberta-base"
-model_path: trained_models/${daystamp}/${fed_alg}-r${rank}-a${alpha}-GPU${gpuid}-${timestamp}
-results_path: results/${daystamp}/${fed_alg}-r${rank}-a${alpha}-GPU${gpuid}-${timestamp}
+timestamp: ${now:%m%d%H%M}
+daystamp: ${now:%m%d}
+model_path: trained_models/${daystamp}/${fed_alg}-r${lora_r}-a${lora_alpha}-GPU${gpuid}-${timestamp}
+results_path: results/${daystamp}/${fed_alg}-r${lora_r}-a${lora_alpha}-GPU${gpuid}-${timestamp}
+output_dir: ${model_path}
+seed: 42
 
 
-# 非 IID 划分超参数
-data:
-  data_partition_method: "noniid"
-  dirichlet_alpha: 0.5
+# model and training
+base_model: roberta-base
+data_path: 20newsgroup
+generate_data: 0
+adapter_name: lora
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+target_modules: ["query", "key", "value", "dense"]
 
-# 客户端本地训练超参数
-client:
-  batch_size: 16
-  learning_rate: 3e-4
-  micro_batch_size: 4      # 如果您使用了微批次训练
-  cutoff_len: 256          # 文本序列最大长度
-  val_set_size: 120
-  adapter_name: "lora"  # LoRA 适配器名称
-  lora_r: ${rank}  # LoRA 的秩
-  lora_alpha: ${alpha}  # LoRA 的缩放系数
-  lora_dropout: 0.05
-  num_epochs: 5
-  base_model: ${model_p_or_n}  # 使用您指定的模型
-  target_modules: ["query", "key","value", "dense"]   
+batch_size: 16
+micro_batch_size: 4
+num_epochs: 5
+learning_rate: 3e-4
+cutoff_len: 256
+val_set_size: 120
 
-# 服务端自定义策略所需超参数
-server:
-  num_clients: 
-  train_ratio: 0.1
-  server_lr: 1.0
-  server_momentum: 0.9
+# federated settings
+fed_alg: CrossLayerD
+num_clients: 100
+train_ratio: 0.1
+data_partition_method: noniid
+dirichlet_alpha: 0.5
+num_rounds: 300
+save_model_freq: 1
 
-# 数据集加载配置
-dataset:
-  _target_: myfl.dataset.twenty_newsgroup
-  data_path: "20newsgroup"     # 您原来传给 fed_finetune.py 的 data_path 参数
-  val_set_size: 0.1
-  test_set_size: 0.1
-  seed: 42
+#默认
+load_8bit : False
+eval_step: 200
+save_step: 200
+use_moslora: False
+use_scalelora: False
+use_masklora: False 
+# bottleneck adapter hyperparams
+bottleneck_size: 256
+non_linearity: tanh
+adapter_dropout: 0.0
+use_parallel_adapter: False
+use_adapterp: False
+scaling:  1.0
+use_gradient_checkpointing: False,
+# prefix tuning hyperparams
+num_virtual_tokens: 30,
+# llm hyperparams
+train_on_inputs: True,  # if False, masks out inputs in loss
+group_by_length: False  # faster, but produces an odd training loss curve
+# wandb params
+# wandb_project: str = ""
+# wandb_run_name: str = ""
+# wandb_watch: str = ""  # options: false | gradients | all
+# wandb_log_model: str = ""  # options: false | true
+resume_from_checkpoint: None  # either training checkpoint or final adapter
 
-# 模型及 LoRA 包装配置
-model:
-  _target_: myfl.models.get_llama_with_lora
-  base_model: ${model_p_or_n}  # 使用您指定的模型
-  lora_r: ${client.lora_r}
-  lora_alpha: ${client.lora_alpha}
-  lora_dropout: ${client.lora_dropout}
-  target_modules: ["query", "key","value", "dense"]   
-
-# 联邦策略配置
-strategy:
-  _target_: myfl.strategy.FedLoCAStrategy
-  fraction_fit: 1.0
-  min_fit_clients: ${num_clients}
-  min_available_clients: ${num_clients}
-  on_fit_config_fn: ${server}            # Hydra 自动把 server.get_on_fit_config() 传入
-  evaluate_fn: ${server}                 # Hydra 自动把 server.get_evaluate_fn() 传入
+num_cpus: 1
+num_gpus: 0.1
+min_fit_clients: 2
+min_available_clients: 2
+gradient_accumulation_steps: 4
