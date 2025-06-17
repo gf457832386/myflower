@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 # 读取日志文件
-with open("./output_flwr.log", "r+") as f:
+with open("./outputs/output_fedavgbbt3.log", "r+") as f:
     text = f.read()
 # 改进的正则表达式 - 匹配"Global test acc:"后的浮点数
 pattern = r"Global test acc:\s*([\d\.]+)"
@@ -66,6 +66,6 @@ plt.annotate(
 
 # 添加图例并保存
 plt.tight_layout()
-plt.savefig("./acc_flwr.png")
+plt.savefig("./outputs/acc_fedavgbbt3.png")
 print(f"图表已保存为 acc.png，包含 {len(data)} 个数据点")
 print(f"最高准确率: {max_y:.4f} 出现在第 {max_x} 轮")

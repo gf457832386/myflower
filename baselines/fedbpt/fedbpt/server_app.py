@@ -12,6 +12,7 @@ from flwr.server import (
 from flwr.server.server import Server
 import hydra
 from .strategy.fedbpt_strategy import FedBPTStrategy
+from .strategy.fedavgbbpt_strategy import FedAvgBBTStrategy
 from .utils import runcfg2args
 def server_fn(context: Context):
     """Construct components that set the ServerApp behaviour."""
@@ -21,11 +22,15 @@ def server_fn(context: Context):
     print(json.dumps(run_config, indent=4))
     print("### END: RUN CONFIG ####")
     cfg = runcfg2args(run_config)
-    run_config = cfg
     config=fl.server.ServerConfig(num_rounds=cfg.num_rounds)
 
     # Define Strategy
-    strategy = FedBPTStrategy(cfg)
+    if run_config['strategy']=="fedbpt":
+        strategy = FedBPTStrategy(cfg)
+    elif run_config['strategy']=="fedavgbbt":
+        strategy = FedAvgBBTStrategy(cfg)
+    else:
+        strategy = FedBPTStrategy(cfg)
     server=Server(client_manager=SimpleClientManager(), strategy=strategy)
     return ServerAppComponents(server=server, config=config)
 

@@ -12,6 +12,7 @@ from cma.recombination_weights import RecombinationWeights
 from transformers import RobertaTokenizer
 from .LMForwardAPI import LMForwardAPI
 from .client.fedbpt_client import FedBPTClient
+from .client.fedavgbbt_client import FedAvgBBTClient
 from flwr.common import Context
 from .utils import runcfg2args
 def gen_client_fn():
@@ -72,7 +73,13 @@ def gen_client_fn():
         # Return Client instance
         print("bbackend_config_stream",flush=True)
         cid = int(cid)
-        return FedBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
+        if run_config['strategy']=="fedbpt":
+            client = FedBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
+        elif run_config['strategy']=="fedavgbbt":
+            client = FedAvgBBTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
+        else:
+            client = FedBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
+        return client
     return client_fn
 
 cfn = gen_client_fn()

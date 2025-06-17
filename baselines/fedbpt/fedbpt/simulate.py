@@ -7,7 +7,7 @@ import flwr as fl
 from flwr.server.server import Server
 from flwr.server.client_manager import SimpleClientManager
 from .utils import save_results_as_pickle
-from .client.fedbpt_client import gen_client_fn
+from .client_app import gen_client_fn
 from .strategy.fedbpt_strategy import FedBPTStrategy
 @hydra.main(config_path="conf", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> None:
