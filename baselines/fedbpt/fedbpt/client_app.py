@@ -71,6 +71,7 @@ def gen_client_fn():
     model_forward_apis=LMForwardAPI(args=args, init_prompt_path=init_prompt_path)
     def client_fn(cid:str):
         # Return Client instance
+        
         print("bbackend_config_stream",flush=True)
         cid = int(cid)
         if run_config['strategy']=="fedbpt":

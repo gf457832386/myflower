@@ -98,6 +98,7 @@ class FedBPTClient(Client):
         self.local_es = global_es._copy_light(
             inopts={"seed": self.seed, "maxiter": self.args.local_iter, "popsize": self.args.local_popsize, "CMA_mu": None}
         )# client es
+        # self.local_es = cma.CMAEvolutionStrategy(global_es.mean, global_es.sigma, inopts={"seed": self.seed, "maxiter": self.args.local_iter, "popsize": self.args.local_popsize, "CMA_mu": None})
 
         local_sigma_current =copy.deepcopy(self.local_es.sigma) 
         global_test_acc = -1
@@ -235,6 +236,7 @@ class FedBPTClient(Client):
             "fitnesses": fitnesses,
             "local_sigmas": local_sigmas,
             "local_cma_mu": self.local_cma_mu,
+            "local_data_num":len(local_train_data)
         }
         # send model back to NVFlare
         print("Client:",self.idx)

@@ -26,7 +26,7 @@ serverapp = "fedbpt.server_app:app"
 clientapp = "fedbpt.client_app:app"
 
 [tool.flwr.app.config]
-strategy = "fedavgbbt"
+strategy = "fedbpt"
 model_name = "roberta-large"
 task_name = "sst2"
 n_prompt_tokens = 50
@@ -57,7 +57,7 @@ perturb = 1
 intrinsic_dim = 500
 num_clients= 10
 min_clients = 10
-num_rounds = 200
+num_rounds = 300
 start_round = 0
 num_users = 10
 iid = 1

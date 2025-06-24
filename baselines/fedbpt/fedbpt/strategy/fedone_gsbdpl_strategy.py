@@ -4,6 +4,7 @@ from logging import DEBUG, INFO, log
 from typing import  List, Tuple, Union
 import copy
 import cma
+import dill
 from flwr.common import FitRes,FitIns
 from flwr.server.strategy import Strategy
 import numpy as np
@@ -15,46 +16,18 @@ FitResultsAndFailures = Tuple[
     List[Union[Tuple[ClientProxy, FitRes], BaseException]],
 ]
 
-
-class FedBPTStrategy(Strategy):
+from flwr.common import FitIns,Parameters
+class GumbelBDPLStrategy(Strategy):
     def __init__(self, args,start_round: int = 0,frac = 1):
         
-        self.frac = frac
-        self.seed = args.seed
-        self.sigma = args.sigma
-        self.intrinsic_dim = args.intrinsic_dim
-        self.bound = args.bound
-        self.num_clients = args.num_clients
-        self.min_num_clients = args.min_clients
-        self.num_rounds = args.num_rounds
-        self.start_round = start_round
-        self.m = max(int(self.frac * self.num_clients), 1)
-        self.args = args
-        self.cma_opts = {
-            "seed": self.seed,
-            "popsize": self.m,
-            "maxiter": self.num_rounds,  # args.epochs,
-            "verbose": -1,
-            "CMA_mu": self.m,
-        }
-        if self.bound > 0:
-            self.cma_opts["bounds"] = [-1 * self.bound, 1 * self.bound]
-        self.global_es = cma.CMAEvolutionStrategy(self.intrinsic_dim * [0], self.sigma, inopts=self.cma_opts)
-        self.server_prompts = [copy.deepcopy(self.global_es.mean)]
-        if args.cat_or_add == "add":
-            init_prompt_path = None
-        else:
-            init_prompt_path = "./nli_base_prompt.pt"
-        self.model_forward_api = LMForwardAPI(args=args, init_prompt_path=init_prompt_path)
-        self.local_sigma_current = self.global_es.sigma
+        self.average_theta
 
     def initialize_parameters(self, client_manager):
         global_model = es2parameters(self.global_es)
         return global_model
 
     def configure_fit(self, server_round, parameters, client_manager):
-        
-        global_model = es2parameters(self.global_es)
+        global_model = Parameters(tensor_type="",tensors=[dill.dumps(self.average_theta)])
         clients = client_manager.sample(
             num_clients=self.num_clients, min_num_clients=self.min_num_clients
         )
@@ -62,6 +35,45 @@ class FedBPTStrategy(Strategy):
         
         ins = [(client,FitIns(parameters=global_model,config={"dim":self.intrinsic_dim,"current_round":server_round})) for client in clients]
         return ins
+        for epoch in range(args.num_train_epochs):
+            # training. 
+            client_prompts_probs_list = []
+            client_dataset_len_list = []
+            for client_idx in random.sample(range(args.num_clients), args.num_activated_clients):
+                # Each client train and update.  
+                client_prompts_probs = client_list[client_idx].local_training(args, model, tokenizer, average_theta, tracker)
+                client_prompts_probs_list.append(client_prompts_probs) #print("client_prompts_probs: \n", client_prompts_probs)
+                # get the weight for averaging. 
+                client_dataset_len_nk = client_list[client_idx].get_len_dataset()
+                client_dataset_len_list.append(client_dataset_len_nk) #print("weight: \n", weight)
+
+            # Fed Average.
+            sampled_client_dataset_len_sum_mt = sum(client_dataset_len_list) 
+            average_theta = sum(nk/sampled_client_dataset_len_sum_mt * tensor for nk, tensor in zip(client_dataset_len_list, client_prompts_probs_list)) 
+            if args.prompt_tuning_method == "prompt-tuning":
+                model.prompt_encoder.default.embedding.weight.data = average_theta
+            elif args.prompt_tuning_method == "prefix-tuning":
+                model.trainable_params.data = average_theta 
+
+            #print(average_theta)
+
+            print(f"eval: {eval_result}")
+            if eval_result >= best_eval_result:
+                best_eval_result = eval_result
+                best_theta = average_theta.clone().detach()
+                if args.prompt_tuning_method == "GumbelBDPL":
+                    best_prompt_prob = eval_prompt_prob.clone().detach()
+                print("best theta")
+            if 'cuda' in str(args.device):
+                torch.cuda.empty_cache()
+            if train_api_request.count >= args.api_limit:
+                break
+            #print(average_theta[0])
+
+            # early stop. 
+            if args.early_stop > 0:
+                if eval_result > args.early_stop:
+                    break
     
     def aggregate_fit(self, server_round, results, failures):
         global_solutions = []
