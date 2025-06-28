@@ -53,6 +53,7 @@ def server_fn(context: Context):
     else:
         strategy = FedBPTStrategy(args)
     server=Server(client_manager=SimpleClientManager(), strategy=strategy)
+    server.set_max_workers(10)
     return ServerAppComponents(server=server, config=config)
 
 
