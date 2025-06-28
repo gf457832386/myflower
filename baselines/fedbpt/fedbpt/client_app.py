@@ -15,10 +15,13 @@ from .client.fedbpt_client import FedBPTClient
 from .client.fedavgbbt_client import FedAvgBBTClient
 from flwr.common import Context
 from .utils import runcfg2args
+from pathlib import Path
+
 def gen_client_fn():
     """Construct a Client that will be run in a ClientApp."""
     # Load model and data
-    with open("/home/hello/yangmuyuan/FL/myflower/baselines/fedbpt/pyproject.toml", "rb") as f:
+    file_path = Path(__file__).parent.parent / "pyproject.toml"
+    with open(file_path, "rb") as f:
         config = tomli.load(f)
     run_config = config['tool']['flwr']['app']['config']
     args = runcfg2args(run_config)
