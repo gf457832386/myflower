@@ -19,6 +19,7 @@ import torch
 from .strategy.fedbpt_strategy import FedBPTStrategy
 from .strategy.fedavgbbpt_strategy import FedAvgBBTStrategy
 from .strategy.fedbpt_dg_strategy import FedBPTDGStrategy
+from .strategy.fedbpt_cluster_strategy import FedBPTClusterStrategy
 from .utils import runcfg2args
 def server_fn(context: Context):
     """Construct components that set the ServerApp behaviour."""
@@ -35,6 +36,8 @@ def server_fn(context: Context):
         strategy = FedBPTStrategy(args)
     elif run_config['strategy']=="fedavgbbt":
         strategy = FedAvgBBTStrategy(args)
+    elif run_config['strategy']=="fedclusertbbt":
+        strategy = FedBPTClusterStrategy(args)
     elif run_config['strategy']=="fedbpt_dg":
         dp = data_processor(args)
         data_bundle = dp.get_data()
