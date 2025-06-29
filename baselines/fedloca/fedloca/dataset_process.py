@@ -10,7 +10,8 @@ from omegaconf import DictConfig
 import os
 import json
 from omegaconf import OmegaConf
-cfg = OmegaConf.load("fedloca/conf/base.yaml")
+base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "conf/base.yaml"))
+cfg = OmegaConf.load(base_path)
 from fedloca.datapartition import partition
 
 

@@ -10,7 +10,7 @@ timestamp: ${now:%m%d%H%M}
 daystamp: ${now:%m%d}
 model_path: trained_models/${daystamp}/${fed_alg}-r${lora_r}-a${lora_alpha}-GPU${gpuid}-${timestamp}
 results_path: results/${daystamp}/${fed_alg}-r${lora_r}-a${lora_alpha}-GPU${gpuid}-${timestamp}
-output_dir: ${model_path}
+output_dir: trained_models/${daystamp}/${fed_alg}-r${lora_r}-a${lora_alpha}-GPU${gpuid}-${timestamp}
 seed: 42
 
 
@@ -32,7 +32,9 @@ cutoff_len: 256
 val_set_size: 120
 
 # federated settings
-fed_alg: CrossLayerD
+strategy:
+  _target_: fedloca.strategy.alg_fedloca.Fedloca
+fed_alg: fedloca
 num_clients: 100
 train_ratio: 0.1
 data_partition_method: noniid
@@ -72,3 +74,4 @@ num_gpus: 0.1
 min_fit_clients: 2
 min_available_clients: 2
 gradient_accumulation_steps: 4
+token: ${HF_USER_TOKEN}

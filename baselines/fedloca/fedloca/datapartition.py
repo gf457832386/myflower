@@ -7,7 +7,9 @@ import os
 import logging  
 from collections import defaultdict 
 from omegaconf import OmegaConf
-cfg = OmegaConf.load("fedloca/conf/base.yaml")
+import os
+base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "conf/base.yaml"))
+cfg = OmegaConf.load(base_path)
 def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)

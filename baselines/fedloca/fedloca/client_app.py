@@ -9,7 +9,9 @@ from torch.utils.data import DataLoader
 from typing import Callable, Dict, List, Tuple
 from transformers import AutoTokenizer
 from omegaconf import OmegaConf
-cfg = OmegaConf.load("fedloca/conf/base.yaml")
+import os
+base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "conf/base.yaml"))
+cfg = OmegaConf.load(base_path)
 from copy import deepcopy
 import random
 from typing import Dict, List
@@ -40,7 +42,7 @@ class FlowerClient(NumPyClient):
         self.model = model
         self.trainloader = train_dataloader
         self.evalloader = eval_dataloader
-        self.local_epochs = cfg.local_epochs
+        self.local_epochs = cfg.num_epochs
         self.cid = cid
         self.output_dir = f"./client_{cid}_output"
         self.tokenizer = tokenizer
@@ -160,7 +162,8 @@ class FlowerClient(NumPyClient):
 def gen_client_fn(model,global_dict,tokenizer,train_dataloader_list, eval_dataloader_list):
     """Generate the client function that creates the Flower Clients."""
 
-    def client_fn(cid: str):
+    def client_fn(cid:str):
+        # cid = context.cid
         train_dataloader = train_dataloader_list[int(cid)]
         eval_dataloader = eval_dataloader_list[int(cid)]
         local_model = deepcopy(model)
@@ -171,7 +174,7 @@ def gen_client_fn(model,global_dict,tokenizer,train_dataloader_list, eval_datalo
 
     return client_fn
 
-# Flower ClientApp
-app = ClientApp(
-    client_fn=gen_client_fn,
-)
+# # Flower ClientApp
+# app = ClientApp(
+#     client_fn=gen_client_fn,
+# )
