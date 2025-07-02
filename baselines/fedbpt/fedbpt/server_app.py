@@ -36,7 +36,7 @@ def server_fn(context: Context):
         strategy = FedBPTStrategy(args)
     elif run_config['strategy']=="fedavgbbt":
         strategy = FedAvgBBTStrategy(args)
-    elif run_config['strategy']=="fedclusertbbt":
+    elif run_config['strategy']=="fedclusterbpt":
         strategy = FedBPTClusterStrategy(args)
     elif run_config['strategy']=="fedbpt_dg":
         dp = data_processor(args)

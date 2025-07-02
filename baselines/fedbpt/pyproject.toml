@@ -26,9 +26,9 @@ serverapp = "fedbpt.server_app:app"
 clientapp = "fedbpt.client_app:app"
 
 [tool.flwr.app.config]
-strategy = "fedbpt"
+strategy = "fedclusterbpt"
 model_name = "roberta-large"
-task_name = "agnews"
+task_name = "sst2"
 n_prompt_tokens = 50
 k_shot = 200
 batch_size = 32
@@ -62,7 +62,7 @@ start_round = 0
 num_users = 10
 iid = 0
 llama_causal = 1
-alpha_dir = 0.3
+alpha_dir = 0.6
 perturb_rate = 0.5
 note = "None"
 init_score_path = "None"

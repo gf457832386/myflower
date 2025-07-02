@@ -7,12 +7,14 @@ import tomli
 import torch
 from flwr.cli.config_utils import load_and_validate,process_loaded_project_config
 from flwr.client import ClientApp
+
 from .data_process import construct_true_few_shot_data, split_data,data_processor
 from cma.recombination_weights import RecombinationWeights
 from transformers import RobertaTokenizer
 from .LMForwardAPI import LMForwardAPI
 from .client.fedbpt_client import FedBPTClient
 from .client.fedavgbbt_client import FedAvgBBTClient
+from .client.fedclusterbbt_client import FedClusterBPTClient
 from flwr.common import Context
 from .utils import runcfg2args
 from pathlib import Path
@@ -81,6 +83,8 @@ def gen_client_fn():
             client = FedBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
         elif run_config['strategy']=="fedavgbbt":
             client = FedAvgBBTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
+        elif run_config['strategy']=="fedclusterbpt":
+            client = FedClusterBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
         else:
             client = FedBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
         return client

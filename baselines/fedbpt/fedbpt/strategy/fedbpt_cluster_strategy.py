@@ -48,6 +48,7 @@ class FedBPTClusterStrategy(Strategy):
             init_prompt_path = "./nli_base_prompt.pt"
         self.model_forward_api = LMForwardAPI(args=args, init_prompt_path=init_prompt_path)
         self.local_sigma_current = self.global_es.sigma
+        self.cross_models = []
 
     def initialize_parameters(self, client_manager):
         global_model = es2parameters(self.global_es)
@@ -59,6 +60,9 @@ class FedBPTClusterStrategy(Strategy):
         clients = client_manager.sample(
             num_clients=self.num_clients, min_num_clients=self.min_num_clients
         )
+
+        if not self.cross_models:
+            self.cross_models = [parameters]
 
         # 确保模型数量不超过客户端数
         model_pool = self.cross_models * (len(clients) // len(self.cross_models) + 1)
@@ -103,6 +107,29 @@ class FedBPTClusterStrategy(Strategy):
             local_Cs.append(params[1])
             local_sigmas.append(params[2])
             local_pcs.append(params[3])
+
+        # for crt in results:
+        #     params = parameters2result(crt[1].parameters)  # 返回 dict
+        #     local_means.append(params["mean"])
+        #     local_Cs.append(params["C"])
+        #     local_sigmas.append(params["sigma"])
+        #     local_pcs.append(params["pc"])
+
+        # for crt in results:
+        #     params = parameters2result(crt[1].parameters)  # params 是一个 dict
+        #     es = cma.CMAEvolutionStrategy(
+        #         self.intrinsic_dim * [0], self.sigma, inopts=self.cma_opts
+        #     )
+        #     es.mean = params["solutions"][0]
+        #     es.C = self.global_es.C  # 如需可改为 params["C"]
+        #     es.sigma = params["local_sigmas"][-1]
+        #     es.pc = self.global_es.pc  # 或根据客户端传回的内容更新
+
+        #     local_means.append(es.mean)
+        #     local_Cs.append(es.C)
+        #     local_sigmas.append(es.sigma)
+        #     local_pcs.append(es.pc)
+
 
         # Global update
         log(INFO,f"Received {len(local_means)} local_es from clients")
