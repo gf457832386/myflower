@@ -154,7 +154,16 @@ class FedCrossBPTStrategy(Strategy):
         top_indices = sorted_indices[:top_k]
 
         # 选出 top 50% 的 CMA-ES 状态
-        top_es_states = [es_states[i] for i in top_indices]
+        # top_es_states = [es_states[i] for i in top_indices]
+        top_es_states = [
+            {
+                "mean": es_states[i]["mean"],
+                "sigma": es_states[i]["sigma"],
+                "B": None,
+                "D": None,
+            }
+            for i in top_indices
+        ]
 
         # 两两随机交叉生成新的 CMA-ES 初始化参数
         offspring_states = []

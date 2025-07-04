@@ -276,8 +276,8 @@ class FedCrossBPTClient(Client):
         }
         # send model back to NVFlare
         print("Client:",self.idx)
-        print("B changed:", not np.allclose(init_B, self.local_es.B))
-        print("D changed:", not np.allclose(init_D, self.local_es.D))
+        # print("B changed:", not np.allclose(init_B, self.local_es.B))
+        # print("D changed:", not np.allclose(init_D, self.local_es.D))
         output_model = result2parameters(params)
         # output_model = Model(params=params,metrics={},current_round=0,tensor_type=int,tensors=[])
         print("Send params back", params.keys())
