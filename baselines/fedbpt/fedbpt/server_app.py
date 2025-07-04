@@ -17,9 +17,10 @@ import hydra
 from transformers import RobertaTokenizer
 import torch
 from .strategy.fedbpt_strategy import FedBPTStrategy
-from .strategy.fedavgbbpt_strategy import FedAvgBBTStrategy
+from .strategy.fedavgbpt_strategy import FedAvgBBTStrategy
 from .strategy.fedbpt_dg_strategy import FedBPTDGStrategy
-from .strategy.fedbpt_cluster_strategy import FedBPTClusterStrategy
+from .strategy.fedclusterbpt_strategy import FedClusterBPTStrategy
+from .strategy.fedcrossbpt_strategy import FedCrossBPTStrategy
 from .utils import runcfg2args
 def server_fn(context: Context):
     """Construct components that set the ServerApp behaviour."""
@@ -37,7 +38,9 @@ def server_fn(context: Context):
     elif run_config['strategy']=="fedavgbbt":
         strategy = FedAvgBBTStrategy(args)
     elif run_config['strategy']=="fedclusterbpt":
-        strategy = FedBPTClusterStrategy(args)
+        strategy = FedClusterBPTStrategy(args)
+    elif run_config['strategy']=="fedcrossbpt":
+        strategy = FedCrossBPTStrategy(args)
     elif run_config['strategy']=="fedbpt_dg":
         dp = data_processor(args)
         data_bundle = dp.get_data()

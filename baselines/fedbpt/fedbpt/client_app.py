@@ -14,7 +14,8 @@ from transformers import RobertaTokenizer
 from .LMForwardAPI import LMForwardAPI
 from .client.fedbpt_client import FedBPTClient
 from .client.fedavgbbt_client import FedAvgBBTClient
-from .client.fedclusterbbt_client import FedClusterBPTClient
+from .client.fedclusterbpt_client import FedClusterBPTClient
+from .client.fedcrossbpt_client import FedCrossBPTClient
 from flwr.common import Context
 from .utils import runcfg2args
 from pathlib import Path
@@ -85,6 +86,8 @@ def gen_client_fn():
             client = FedAvgBBTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
         elif run_config['strategy']=="fedclusterbpt":
             client = FedClusterBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
+        elif run_config['strategy']=="fedcrossbpt":
+            client = FedCrossBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
         else:
             client = FedBPTClient(args,train_data,dev_data,test_data,user_dict_train,user_dict_dev,cid,tokenizers,model_forward_apis,local_cma_mu).to_client()
         return client

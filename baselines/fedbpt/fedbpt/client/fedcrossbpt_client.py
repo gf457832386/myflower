@@ -15,7 +15,7 @@ from flwr.common import FitRes,Status,Code,EvaluateRes
 from flwr.client.client import Client
 from ..utils import parameters2es,result2parameters
 # Define Flower Client and client_fn
-class FedAvgBBTClient(Client):
+class FedCrossBPTClient(Client):
     def __init__(self, args,train_data,dev_data,test_data,user_dict_train,user_dict_dev, client_id,tokenizer,model_forward_api,local_cma_mu,frac = 1):
 
         self.tokenizer = tokenizer
@@ -84,58 +84,90 @@ class FedAvgBBTClient(Client):
             "maxiter": self.args.local_iter,  # args.epochs,
             "verbose": -1,
             "CMA_mu": None,
+            "CMA_active": True,          # 激活主动协方差更新
+            "updatecov": 1,              # 每轮更新协方差
         }
         self.local_es = cma.CMAEvolutionStrategy(self.args.intrinsic_dim * [0], self.sigma, inopts=self.cma_opts)
 
     def fit(self, ins,timeout=0, group_id=0):
-        #收到服务器传来的 CMA-ES 参数
         # 从server获取模型参数
-        global_es = parameters2es(ins.parameters)# sever es
+        # global_es = parameters2es(ins.parameters)# sever es
         current_round = ins.config['current_round']
-        print(f"Running current_round={current_round}")
-        print(
-            f"Received global_es.sigma={global_es.sigma} and global_es.mean: len={len(global_es.mean)}, mean={np.mean(global_es.mean)}, std={np.std(global_es.mean)}"
-        )
-        #同步全局状态到本地的CMA-ES
-        self.local_es.mean = global_es.mean
-        self.local_es.C = global_es.C
-        self.local_es.sigma = global_es.sigma
-        # self.local_es.pc = global_es.pc
+        # print(f"Running current_round={current_round}")
+        # print(
+        #     f"Received global_es.sigma={global_es.sigma} and global_es.mean: len={len(global_es.mean)}, mean={np.mean(global_es.mean)}, std={np.std(global_es.mean)}"
+        # )
         # self.local_es = global_es._copy_light(
         #     inopts={"seed": self.seed, "maxiter": self.args.local_iter, "popsize": self.args.local_popsize, "CMA_mu": None}
         # )# client es
+        # self.local_es = cma.CMAEvolutionStrategy(global_es.mean, global_es.sigma, inopts={"seed": self.seed, "maxiter": self.args.local_iter, "popsize": self.args.local_popsize, "CMA_mu": None})
 
-        local_sigma_current = self.local_es.sigma
+
+        # 解码 {mean, sigma, B, D}
+        state = parameters2es(ins.parameters)
+        mean = state["mean"]
+        sigma = state["sigma"]
+        B = state["B"]
+        D = state["D"]
+
+        # 显式构造 CMA-ES 优化器
+        self.local_es = cma.CMAEvolutionStrategy(
+            x0=mean,
+            sigma0=sigma,
+            inopts={
+                "seed": self.seed,
+                "maxiter": self.args.local_iter,
+                "popsize": self.args.local_popsize,
+                "CMA_mu": None,
+                "verbose": -1,
+                "CMA_active": True,   # 主动协方差更新策略
+                "updatecov": 1,       # 每轮都更新协方差矩阵
+            }
+        )
+
+        # 注入方向信息（保留的 B, D）
+        init_B = copy.deepcopy(B)
+        init_D = copy.deepcopy(D)
+        self.local_es.B = B
+        self.local_es.D = D
+        if B is not None and D is not None:
+            self.local_es.C = (B @ np.diag(D ** 2)) @ B.T
+        # self.local_es.C = (B @ np.diag(D ** 2)) @ B.T  # Recompute C
+
+        local_sigma_current =copy.deepcopy(self.local_es.sigma) 
         global_test_acc = -1
-        if self.idx in self.eval_clients:
-            # 测试
-            print("Global es evaluate on test data...")
-            self.global_api_setting["best_prompt"] = self.local_es.mean
-            self.model_forward_api.load_client_record(self.global_api_setting)
-            global_test_acc = self.model_forward_api.eval(prompt_embedding=self.local_es.mean, test_data=self.test_data)
-            print("Global test acc: {}".format(round(global_test_acc, 4)))
-            print("Global prompt norm: {}".format(np.linalg.norm(self.local_es.mean)))
-            # writer.add_scalar("global_test_acc", global_test_acc, current_round)
+        
+        # # 测试
+        # print("Global es evaluate on test data...")
+        # self.global_api_setting["best_prompt"] = self.local_es.mean
+        # self.model_forward_api.load_client_record(self.global_api_setting)
+        # global_test_acc = self.model_forward_api.eval(prompt_embedding=self.local_es.mean, test_data=self.test_data)
+        # print("Global test acc: {}".format(round(global_test_acc, 4)))
+        # print("Global prompt norm: {}".format(np.linalg.norm(self.local_es.mean)))
+        # # writer.add_scalar("global_test_acc", global_test_acc, current_round)
 
-            if self.args.norm_prompt and np.linalg.norm(self.local_es.mean) < self.args.prompt_norm_threshold_upper:
-                self.args.prompt_norm_threshold += 1
-                self.model_forward_api.args = self.args
-                print("Set prompt_norm_threshold as {}".format(self.args.prompt_norm_threshold))
-            if self.args.save_prompt:
-                if global_test_acc > self.best_test_acc:
-                    self.best_test_acc = global_test_acc
-                    torch.save(
-                        self.model_forward_api.model.prompt_embedding.cpu().detach(),
-                        "results/llama/sst2/larger_global_pop_new_sigma_pert/fl_prompt.pt",
-                    )
-        else:
-            global_test_acc = -1
+        # if self.args.norm_prompt and np.linalg.norm(self.local_es.mean) < self.args.prompt_norm_threshold_upper:
+        #     self.args.prompt_norm_threshold += 1
+        #     self.model_forward_api.args = self.args
+        #     print("Set prompt_norm_threshold as {}".format(self.args.prompt_norm_threshold))
+        # if self.args.save_prompt:
+        #     if global_test_acc > self.best_test_acc:
+        #         self.best_test_acc = global_test_acc
+        #         torch.save(
+        #             self.model_forward_api.model.prompt_embedding.cpu().detach(),
+        #             "results/llama/sst2/larger_global_pop_new_sigma_pert/fl_prompt.pt",
+        #         )
+        
+
         client_sigmas = {}
+
         self.model_forward_api.load_client_record(self.client_api_setting_list[self.idx])
         # initialize local data，获取当前client的训练数据
+
         train_sample_idxs, dev_sample_idxs = self.user_dict_train[self.idx], self.user_dict_dev[self.idx]
         print(f"Client {self.idx} execute local training on {len(train_sample_idxs)} samples...")
         print(f"Client {self.idx} train_sample_idxs {train_sample_idxs}")
+
         local_train_data = {
             "input_ids": torch.tensor(self.train_data["input_ids"].get(train_sample_idxs)),
             "attention_mask": torch.tensor(self.train_data["attention_mask"].get(train_sample_idxs)),
@@ -159,25 +191,36 @@ class FedAvgBBTClient(Client):
             self.train_data["labels"] = self.train_data["labels"].repeat(self.local_es.popsize)
 
         local_train_data_aux = perturb_dataset(self.args, local_train_data, self.model_forward_api.config)
+
         self.model_forward_api.set_dataset(local_train_data, local_dev_data, local_train_data_aux)
 
+        local_sigmas = []
         start_time = time.time()
         # client训练
         train_step = 0
         while not self.local_es.stop():
+            local_sigmas.append(self.local_es.sigma)
             solutions = self.local_es.ask()
             if self.args.norm_prompt:
                 for i in range(len(solutions)):
                     if np.linalg.norm(solutions[i]) > self.args.prompt_norm_threshold:
                         solutions[i] = solutions[i] / np.linalg.norm(solutions[i]) * self.args.prompt_norm_threshold
             if self.parallel:
-                fitnesses = self.model_forward_api.eval(solutions)
+                fitnesses_orig = self.model_forward_api.eval(solutions)
+                fitnesses_pert = self.model_forward_api.eval_perturb(solutions)
+                if self.args.perturb != 0:
+                    fitnesses = fitnesses_orig / fitnesses_pert
+                else:
+                    fitnesses = fitnesses_orig
             else:
-                fitnesses = [self.model_forward_api.eval(x) for x in solutions]
+                if self.args.perturb != 0:
+                    fitnesses = [self.model_forward_api.eval(x) / self.model_forward_api.eval_perturb(x) for x in solutions]
+                else:
+                    fitnesses = [self.model_forward_api.eval(x) for x in solutions]
             self.local_es.tell(solutions, fitnesses)
-            if train_step % 10 == 0:
+            if len(local_sigmas) % 10 == 0:
                 test_acc = self.model_forward_api.eval(prompt_embedding=self.local_es.mean, test_data=self.test_data)
-                print(f"Local test acc at local iter {train_step}: {round(test_acc, 4)}")
+                print(f"Local test acc at local iter {len(local_sigmas)}: {round(test_acc, 4)}")
                 # writer.add_scalar("local_test_acc", test_acc, train_step)
             train_step += 1
 
@@ -185,6 +228,7 @@ class FedAvgBBTClient(Client):
         print("Done. Elapsed time: {} (mins)".format((end_time - start_time) / 60))
 
         self.client_prompt_dict[self.idx].append(copy.deepcopy(self.local_es.mean))
+
         # Generate solutions uploaded to the server
         solutions = [self.local_es.mean]
         if self.args.norm_prompt:
@@ -192,37 +236,72 @@ class FedAvgBBTClient(Client):
                 if np.linalg.norm(solutions[i]) > self.args.prompt_norm_threshold:
                     solutions[i] = solutions[i] / np.linalg.norm(solutions[i]) * self.args.prompt_norm_threshold
         if self.parallel:
-            fitnesses = self.model_forward_api.eval(solutions)
+            fitnesses_orig = self.model_forward_api.eval(solutions)
+            fitnesses_pert = self.model_forward_api.eval_perturb(solutions)
+            if self.args.perturb != 0:
+                fitnesses = fitnesses_orig / fitnesses_pert
+            else:
+                fitnesses = fitnesses_orig
         else:
-            fitnesses = np.array([self.model_forward_api.eval(x) for x in solutions])
+            fitnesses_orig = np.array([self.model_forward_api.eval(x) for x in solutions])
+            fitnesses_pert = np.array([self.model_forward_api.eval_perturb(x) for x in solutions])
+            if self.args.perturb != 0:
+                fitnesses = fitnesses_orig / fitnesses_pert
+            else:
+                fitnesses = fitnesses_orig
 
         test_acc = self.model_forward_api.eval(prompt_embedding=self.local_es.mean, test_data=self.test_data)
         print(f"Local test acc after current_round {current_round}: {round(test_acc, 4)}")
 
-        self.client_fitnesses_orig_dict[self.idx].append(copy.deepcopy(fitnesses))
+        print(f"client sigma: {local_sigmas}")
+
+        self.client_fitnesses_orig_dict[self.idx].append(copy.deepcopy(fitnesses_orig))
+        self.client_fitnesses_pert_dict[self.idx].append(copy.deepcopy(fitnesses_pert))
+
         self.client_api_setting_list[self.idx] = self.model_forward_api.client_record()
+
         self.global_api_setting = self.model_forward_api.client_record()
 
-        # construct trained FL model update 
-        params=[self.local_es.mean,self.local_es.C,self.local_es.sigma,self.local_es.pc]
+        # construct trained FL model update
+        
+        params={
+            "solutions": solutions,
+            "fitnesses": fitnesses,
+            "local_sigmas": local_sigmas,
+            "local_cma_mu": self.local_cma_mu,
+            "local_data_num":len(local_train_data),
+
+            "B": self.local_es.B,
+            "D": self.local_es.D,
+        }
         # send model back to NVFlare
         print("Client:",self.idx)
+        print("B changed:", not np.allclose(init_B, self.local_es.B))
+        print("D changed:", not np.allclose(init_D, self.local_es.D))
         output_model = result2parameters(params)
+        # output_model = Model(params=params,metrics={},current_round=0,tensor_type=int,tensors=[])
+        print("Send params back", params.keys())
         return FitRes(status=Status(
                 code=Code.OK,
                 message="Client fit",),
             parameters=output_model,
             num_examples=len(solutions),
-            metrics={"test acc":global_test_acc},)
+            # metrics={},)
+            metrics={"test acc":test_acc},)
 
     def evaluate(self, parameters):
         # 测试
-        print("Global es evaluate on test data...")
+        current_round = getattr(self, "current_round", -1)  # 安全获取当前轮数
+        print(f"[Client {self.idx}] Global ES evaluation on test data at round {current_round}...")
+
+        # print("Global es evaluate on test data...")
         self.global_api_setting["best_prompt"] = self.local_es.mean
         self.model_forward_api.load_client_record(self.global_api_setting)
         global_test_acc = self.model_forward_api.eval(prompt_embedding=self.local_es.mean, test_data=self.test_data)
-        print("Global test acc: {}".format(round(global_test_acc, 4)))
-        print("Global prompt norm: {}".format(np.linalg.norm(self.local_es.mean)))
+        print(f"[Client {self.idx}] Round {current_round} - Global test acc: {round(global_test_acc, 4)}")
+        print(f"[Client {self.idx}] Global prompt norm: {np.linalg.norm(self.local_es.mean)}")
+        # print("Global test acc: {}".format(round(global_test_acc, 4)))
+        # print("Global prompt norm: {}".format(np.linalg.norm(self.local_es.mean)))
         # writer.add_scalar("global_test_acc", global_test_acc, current_round)
 
         if self.args.norm_prompt and np.linalg.norm(self.local_es.mean) < self.args.prompt_norm_threshold_upper:

@@ -17,7 +17,7 @@ FitResultsAndFailures = Tuple[
 import random
 
 
-class FedBPTClusterStrategy(Strategy):
+class FedClusterBPTStrategy(Strategy):
     def __init__(self, args,start_round: int = 0,frac = 1):
         
         self.frac = frac
