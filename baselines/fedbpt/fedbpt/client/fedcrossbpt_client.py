@@ -109,6 +109,8 @@ class FedCrossBPTClient(Client):
         sigma = state["sigma"]
         B = state["B"]
         D = state["D"]
+        print(f"[Round {current_round}] Client {self.idx} received global ES state: mean norm = {np.linalg.norm(mean):.4f}, sigma = {sigma:.4f}")
+        
 
         # 显式构造 CMA-ES 优化器
         self.local_es = cma.CMAEvolutionStrategy(

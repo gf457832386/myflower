@@ -85,6 +85,7 @@ class FedCrossBPTStrategy(Strategy):
                 "dim": self.intrinsic_dim,
                 "current_round": server_round
             })))
+           
         return ins
 
     def aggregate_fit(self, server_round, results, failures):
