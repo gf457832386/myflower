@@ -192,8 +192,14 @@ class FedCrossBPTStrategy(Strategy):
             # f1 = fitnesses[sorted_indices.tolist().index(es_states.index(p1))]
             # f2 = fitnesses[sorted_indices.tolist().index(es_states.index(p2))]
             alpha = f1 / (f1 + f2 + 1e-8)
-            new_mean = alpha * p1["mean"] + (1 - alpha) * p2["mean"]
-            new_sigma = (p1["sigma"] + p2["sigma"]) / 2
+            # new_mean = alpha * p1["mean"] + (1 - alpha) * p2["mean"]
+            # new_sigma = (p1["sigma"] + p2["sigma"]) / 2
+            # 添加轻微扰动，避免陷入局部最优
+            noise = np.random.randn(*p1["mean"].shape) * 0.01
+            new_mean = alpha * p1["mean"] + (1 - alpha) * p2["mean"] + noise
+
+            # 设置 sigma 下限，避免为 0
+            new_sigma = max((p1["sigma"] + p2["sigma"]) / 2, 1e-3)
             # offspring_states.append({"mean": new_mean, "sigma": new_sigma})
 
             

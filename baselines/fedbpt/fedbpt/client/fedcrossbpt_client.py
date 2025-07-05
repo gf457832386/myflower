@@ -122,6 +122,7 @@ class FedCrossBPTClient(Client):
                 "verbose": -1,
                 "CMA_active": True,   # 主动协方差更新策略
                 "updatecov": 1,       # 每轮都更新协方差矩阵
+                "minstd": 1e-3, 
             }
         )
 
